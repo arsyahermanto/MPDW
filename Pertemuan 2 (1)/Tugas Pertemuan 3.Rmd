@@ -1,0 +1,354 @@
+---
+title: "Tugas Praktikum 3"
+author: "Arsya Danendra Hermanto"
+date: "2026-09-02"
+output:
+  rmdformats::readthedown:
+    code_folding: hide
+    toc_depth: 3
+---
+
+
+```{r}
+library(dplyr)
+library(TTR)
+library(forecast)
+library(lmtest)
+library(orcutt)
+library(HoRM)
+```
+
+# Data 1
+
+```{r}
+library(readxl)
+
+data1 <- read_excel("C:\\Users\\Asus\\Downloads\\data_market_share_price.xlsx")
+data1
+```
+
+```{r}
+data1 <- data1 %>%
+  rename(market.share = `Market share`)
+
+data1
+```
+
+```{r}
+plot(data1$Price, data1$market.share,
+     xlab = "Price",
+     ylab = "Market Share",
+     main = "Scatter Plot Price vs Market Share")
+
+cor(data1$Price, data1$market.share)
+```
+
+
+
+
+## Regresi 1
+
+```{r}
+model1 <- lm(market.share ~ Price, data = data1)
+
+summary(model1)
+```
+
+```{r}
+sisaan1 <- residuals(model1)
+
+plot(sisaan1,
+     type = "o",
+     xlab = "Periode",
+     ylab = "Sisaan",
+     main = "Plot Sisaan Model")
+
+abline(h = 0)
+```
+
+```{r}
+par(mfrow = c(1,2))
+
+acf(sisaan1,
+    main = "ACF Sisaan")
+
+pacf(sisaan1,
+     main = "PACF Sisaan")
+```
+
+```{r}
+dwtest(model1)
+```
+
+Berdasarkan plot sisaan, ACF, dan PACF, terlihat adanya indikasi autokorelasi pada sisaan. Selanjutnya, dilakukan uji formal menggunakan uji Durbin-Watson. Berdasarkan hasil uji Durbin-Watson, diperoleh nilai $DW = 1.1358$ dan $p-value = 0.009813$. Dengan menggunakan taraf nyata 5%, diperoleh p-value \< 0.05 sehingga H0 ditolak. Artinya, terdapat cukup bukti untuk menyatakan bahwa terdapat autokorelasi positif pada sisaan model. Oleh karena itu, diperlukan penanganan autokorelasi. Penanganan selanjutnya dilakukan menggunakan metode Cochrane-Orcutt dan Hildreth-Lu.
+
+## Penangagan Data 1
+
+### Cochrane-Orcutt
+
+```{r}
+model1CO <- cochrane.orcutt(model1)
+
+model1CO
+```
+
+```{r}
+rho1<- model1CO$rho
+rho1
+```
+
+```{r}
+market.share.trans <- data1$market.share[-1] -
+  data1$market.share[-20] * rho1
+
+price.trans <- data1$Price[-1] -
+  data1$Price[-20] * rho1
+
+model1COmanual <- lm(market.share.trans ~ price.trans)
+
+summary(model1COmanual)
+```
+
+```{r}
+b0bintang <- model1COmanual$coefficients[-2]
+
+b0 <- b0bintang/(1-rho1)
+
+b1 <- model1COmanual$coefficients[-1]
+
+b0
+b1
+```
+
+```{r}
+dwtest(model1COmanual)
+```
+
+Berdasarkan hasil uji Durbin-Watson setelah dilakukan penanganan autokorelasi menggunakan metode Cochrane-Orcutt, diperoleh nilai $DW = 1,958$ dan $p-value = 0,4151$. Pada taraf nyata 5%, p-value > 0,05 sehingga H0 tidak ditolak. Dengan demikian, tidak terdapat cukup bukti adanya autokorelasi positif pada sisaan model setelah dilakukan penanganan menggunakan metode Cochrane-Orcutt.
+
+
+### Hiderth-lu
+
+```{r}
+hildreth.lu.func <- function(r, model1){
+  x <- model.matrix(model1)[,-1]
+  y <- model.response(model.frame(model1))
+  n <- length(y)
+  t <- 2:n
+  y <- y[t]-r*y[t-1]
+  x <- x[t]-r*x[t-1]
+  
+  return(lm(y~x))
+}
+
+
+r <- c(seq(0.1,0.9, by = 0.1))
+
+tab <- data.frame(
+  "rho" = r,
+  "SSE" = sapply(r, function(i){
+    deviance(hildreth.lu.func(i, model1))
+  })
+)
+
+round(tab, 4)
+```
+
+```{r}
+rOpt <- seq(0.2,0.5, by = 0.001)
+
+tabOpt <- data.frame(
+  "rho" = rOpt,
+  "SSE" = sapply(rOpt, function(i){
+    deviance(hildreth.lu.func(i, model1))
+  })
+)
+
+head(tabOpt[order(tabOpt$SSE),])
+```
+
+```{r}
+modelHL1 <- hildreth.lu.func(0.425	, model1)
+
+summary(modelHL1)
+```
+
+```{r}
+cat("Market Share = ",
+    coef(modelHL1)[1]/(1-0.425),
+    "+",
+    coef(modelHL1)[2],
+    "Price",
+    sep = "")
+```
+
+```{r}
+dwtest(modelHL1)
+```
+
+Berdasarkan hasil uji Durbin-Watson setelah dilakukan penanganan autokorelasi menggunakan metode Hildreth-Lu dengan nilai $\rho=0.425$, diperoleh nilai $DW=1.9577$ dan p-value sebesar 0.4148. Pada taraf nyata 5%, diperoleh p-value \> 0.05 sehingga H0 tidak ditolak. Dengan demikian, tidak terdapat cukup bukti adanya autokorelasi positif pada sisaan setelah dilakukan penanganan menggunakan metode Hildreth-Lu.
+
+
+
+
+
+
+# Data 2
+
+```{r}
+data2 <- read_excel("C:\\Users\\Asus\\Downloads\\data_sales_advertising.xlsx")
+data2
+```
+
+```{r}
+plot(data2$Advertising, data2$Sales,
+     xlab = "Advertising",
+     ylab = "Sales",
+     main = "Scatter Plot Advertising dan Sales")
+
+cor(data2$Advertising, data2$Sales)
+```
+
+## Regresi OLS 2
+
+```{r}
+model2 <- lm(Sales ~ Advertising, data = data2)
+
+summary(model2)
+```
+
+```{r}
+sisaan2 <- residuals(model2)
+
+plot(sisaan2,
+     type = "l",
+     xlab = "Period",
+     ylab = "Sisaan",
+     main = "Plot Sisaan Model OLS")
+
+abline(h = 0)
+```
+
+```{r}
+par(mfrow = c(1,2))
+
+acf(sisaan2,
+    main = "ACF Sisaan")
+
+pacf(sisaan2,
+     main = "PACF Sisaan")
+```
+
+```{r}
+dwtest(model2)
+```
+
+Berdasarkan hasil uji Durbin-Watson pada model OLS, diperoleh nilai $DW = 0,16204$ dengan $p-value < 2,2 × 10⁻¹⁶$. Pada taraf nyata 5%, p-value < 0,05 sehingga H₀ ditolak dan H₁ diterima. Dengan demikian, terdapat autokorelasi positif pada sisaan model OLS. Hal ini juga didukung oleh plot sisaan, ACF, dan PACF yang menunjukkan adanya pola pada sisaan. Oleh karena itu, diperlukan penanganan autokorelasi menggunakan metode Cochrane-Orcutt dan Hildreth-Lu.
+
+## Penanganan Data 2
+
+### Cochrane-Orcutt
+
+```{r}
+model2CO <- cochrane.orcutt(model2)
+
+summary(model2CO)
+```
+
+```{r}
+rho2 <- model2CO$rho
+rho2
+```
+
+```{r}
+Y2 <- data2$Sales
+X2 <- data2$Advertising
+
+n2 <- length(Y2)
+
+Y2.trans <- Y2[-1] - Y2[-n2] * rho2
+X2.trans <- X2[-1] - X2[-n2] * rho2
+
+model2COmanual <- lm(Y2.trans ~ X2.trans)
+
+summary(model2COmanual)
+```
+
+```{r}
+b0bintang2 <- model2COmanual$coefficients[-2]
+
+b0_2 <- b0bintang2/(1-rho2)
+
+b1_2 <- model2COmanual$coefficients[-1]
+
+b0_2
+b1_2
+```
+
+```{r}
+dwtest(model2COmanual)
+```
+
+Berdasarkan hasil uji Durbin-Watson setelah dilakukan penanganan autokorelasi menggunakan metode Cochrane-Orcutt, diperoleh nilai DW = 1,9393 dan p-value = 0,378. Pada taraf nyata 5%, p-value > 0,05 sehingga H₀ tidak ditolak. Dengan demikian, tidak terdapat cukup bukti adanya autokorelasi positif pada sisaan model setelah dilakukan penanganan menggunakan metode Cochrane-Orcutt. Oleh karena itu, metode Cochrane-Orcutt berhasil mengatasi masalah autokorelasi pada model OLS.
+
+
+### Hildreth-Lu
+
+```{r}
+hildreth.lu.func <- function(r, model){
+  x <- model.matrix(model)[,-1]
+  y <- model.response(model.frame(model))
+  n <- length(y)
+  t <- 2:n
+  y <- y[t]-r*y[t-1]
+  x <- x[t]-r*x[t-1]
+  
+  return(lm(y~x))
+}
+
+# Mencari nilai rho
+r <- c(seq(0.1,0.9, by = 0.1))
+
+tab2 <- data.frame(
+  "rho" = r,
+  "SSE" = sapply(r, function(i){
+    deviance(hildreth.lu.func(i, model2))
+  })
+)
+
+round(tab2, 4)
+```
+
+```{r}
+r <- c(seq(0.1,0.9, by = 0.001))
+
+tab2 <- data.frame(
+  "rho" = r,
+  "SSE" = sapply(r, function(i){
+    deviance(hildreth.lu.func(i, model2))
+  })
+)
+
+tab2[order(tab2$SSE),][1:10,]
+```
+
+```{r}
+modelHL2 <- hildreth.lu.func(0.900	, model2)
+
+summary(modelHL2)
+```
+
+```{r}
+cat("Sales = ",
+    coef(modelHL2)[1]/(1-0.900),
+    "+",
+    coef(modelHL2)[2],
+    "Advertising",
+    sep = "")
+```
+
+```{r}
+dwtest(modelHL2)
+```
+
+Berdasarkan hasil uji Durbin-Watson setelah dilakukan penanganan autokorelasi menggunakan metode Hildreth-Lu, diperoleh nilai $DW = 1,9402$ dan $p-value = 0,3782$. Pada taraf nyata 5%, p-value > 0,05 sehingga H₀ tidak ditolak. Dengan demikian, tidak terdapat cukup bukti adanya autokorelasi positif pada sisaan model setelah dilakukan penanganan menggunakan metode Hildreth-Lu. Oleh karena itu, metode Hildreth-Lu berhasil mengatasi masalah autokorelasi pada model OLS.
