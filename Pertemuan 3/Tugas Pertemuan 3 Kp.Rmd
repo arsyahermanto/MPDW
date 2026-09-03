@@ -1,0 +1,180 @@
+---
+title: "Tugas Praktikum/Kuliah 3"
+author: "Arsya Danendra Hermanto"
+date: "2026-09-03 jam 14:30"
+output:
+  rmdformats::readthedown:
+    code_folding: hide
+    toc_depth: 3
+---
+
+```{r}
+library(dLagM)
+library(lmtest)
+library(tseries)
+library(car)
+```
+
+# Nomor 1
+
+## Data 1
+
+```{r}
+data1 <- data.frame(
+  Periode = 1:20,
+  
+  Yt = c(
+    3.63, 4.20, 3.33, 4.54, 2.89,
+    4.87, 4.90, 5.29, 6.18, 7.20,
+    7.25, 6.09, 6.80, 8.65, 8.43,
+    8.29, 7.18, 7.90, 8.45, 8.23
+  ),
+  
+  Xt = c(
+    0.97, 0.95, 0.99, 0.91, 0.98,
+    0.90, 0.89, 0.86, 0.85, 0.82,
+    0.79, 0.83, 0.81, 0.77, 0.76,
+    0.80, 0.83, 0.79, 0.76, 0.78
+  )
+)
+
+data1
+```
+
+## Finite Distributed Lag
+
+```{r}
+model.finite1.1 <- dlm(
+  x = data1$Xt,
+  y = data1$Yt,
+  q = 1
+)
+
+model.finite1.2 <- dlm(
+  x = data1$Xt,
+  y = data1$Yt,
+  q = 2
+)
+
+model.finite1.3 <- dlm(
+  x = data1$Xt,
+  y = data1$Yt,
+  q = 3
+)
+
+summary(model.finite1.1)
+summary(model.finite1.2)
+summary(model.finite1.3)
+```
+
+Berdasarkan AIC dan BIC, model finite dengan Lag 3 terbaik dengan AIC 22,3435 dan BIC 27,3428.
+
+## Model Koyck
+
+```{r}
+model.koyck1 <- koyckDlm(x = data1$Xt,y = data1$Yt)
+
+summary(model.koyck1)
+AIC(model.koyck1)
+BIC(model.koyck1)
+```
+
+Model Koyck Menghasilkan AIC 35,9708 dan BIC 39,7486.
+
+## ARDL
+
+```{r}
+model.ardl.best <- ardlBoundOrders(
+  data = data1,
+  ic = "AIC",
+  formula = Yt ~ Xt
+)
+
+model.ardl.best
+```
+
+```{r}
+model.ardl <- ardlDlm(
+  formula = Yt ~ Xt,
+  data = data1,
+  p = 4,
+  q = 5
+)
+
+summary(model.ardl)
+```
+
+ARDL memiliki AIC terendah sebesar -20,41095 dengan orde p = 4 dan q = 5
+
+## Kesimpulan
+
+Berdasarkan hasil pemodelan Finite Distributed Lag Model, Koyck Lag Model, dan Autoregressive Distributed Lag (ARDL), diperoleh bahwa Finite DLM terbaik adalah lag 3 (q = 3) dengan AIC 22,3435, sedangkan Koyck menghasilkan AIC 35,9708 dan ARDL terbaik adalah ARDL(4,5) dengan AIC -20,41095. Dengan membandingkan nilai AIC tersebut, ARDL(2,6) dipilih sebagai model terbaik karena memiliki nilai AIC paling rendah, sehingga model ini dianggap paling baik dalam menggambarkan hubungan Market Share terhadap Price dengan mempertimbangkan pengaruh Price dan Market Share pada beberapa periode sebelumnya.
+
+# Nomor 2
+
+## Data 2
+
+```{r}
+data2 <- data.frame(
+  Year = 1975:2014,
+  
+  Sales = c(
+    11.7, 12.0, 12.3, 12.8, 13.1,
+    13.6, 13.9, 14.4, 14.7, 15.3,
+    15.5, 15.8, 16.1, 16.6, 16.9,
+    16.7, 16.9, 17.4, 17.6, 17.9,
+    18.0, 17.9, 18.0, 18.2, 18.2,
+    18.3, 18.6, 19.2, 19.3, 19.5,
+    19.2, 19.3, 19.5, 20.0, 20.0,
+    19.9, 19.8, 19.9, 20.2, 21.0
+  ),
+  
+  Advertising = c(
+    9.4, 9.6, 10.0, 10.4, 10.8,
+    10.9, 11.7, 12.2, 12.5, 12.9,
+    13.0, 13.2, 13.8, 14.2, 14.6,
+    14.4, 15.0, 15.4, 15.7, 15.9,
+    15.9, 16.0, 16.3, 16.2, 16.8,
+    17.3, 17.6, 18.1, 18.3, 18.5,
+    18.7, 18.9, 19.2, 20.0, 20.0,
+    20.3, 20.4, 21.0, 21.5, 22.1
+  )
+)
+
+data2
+```
+
+## ARDL
+
+```{r}
+ardl.opt2 <- ardlBoundOrders(
+  data = data2,
+  formula = Sales ~ Advertising,
+  ic = "AIC"
+)
+
+ardl.opt2
+```
+
+```{r}
+model.ardl2 <- ardlDlm(
+  formula = Sales ~ Advertising,
+  data = data2,
+  p = 4,
+  q = 15
+)
+
+summary(model.ardl2)
+```
+
+AIC = -305,75496
+
+Adjusted R² = 0,9372
+
+R² = 0,9895
+
+Uji F signifikan, p-value = 0,005655
+
+## Kesimpulan
+
+Berdasarkan hasil pemilihan orde menggunakan AIC, diperoleh model ARDL(4,15) sebagai model terbaik dengan AIC sebesar -305,75496 dan Adjusted R² sebesar 93,72%, sehingga model mampu menjelaskan sebagian besar variasi Sales berdasarkan Advertising dan lag variabelnya.
