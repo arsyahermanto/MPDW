@@ -1,0 +1,662 @@
+---
+title: "Tugas Praktikum 4"
+author: "Arsya Danendra Hermanto"
+date: "2026-09-18"
+output:
+  rmdformats::readthedown:
+    code_folding: hide
+    toc_depth: 3
+---
+
+```{r}
+library(forecast)
+library(tseries)
+library(TSA)
+```
+
+# Nomor 1 MA(2)
+
+## Membangkit Model
+
+### Manual
+
+```{r}
+theta1 <- 0.4
+theta2 <- 0.6
+n <- 300
+
+set.seed(125)
+
+e <- rnorm(n)
+Y <- numeric(n)
+
+Y[1] <- e[1]
+Y[2] <- e[2] - theta1 * e[1]
+
+for (t in 3:n) {
+  Y[t] <- e[t] - theta1 * e[t-1] - theta2 * e[t-2]
+}
+
+# Mengubah menjadi time series
+Y.ts <- ts(Y)
+Y.ts
+```
+
+### Arima.sim
+
+```{r}
+set.seed(125)
+
+Y.sim <- arima.sim(
+  model = list(ma = c(-0.4, -0.6)),
+  n = n
+)
+
+Y.sim
+```
+
+## plot
+
+### Plot Time Series
+
+```{r}
+plot(Y.ts, main = "Time Series MA(2) - Manual",
+  xlab = "Waktu",
+  ylab = "Yt"
+)
+
+plot(Y.sim, main = "Time Series MA(2) - arima.sim",
+  xlab = "Waktu",
+  ylab = "Yt"
+)
+```
+
+Plot time series menunjukkan data berfluktuasi di sekitar nilai rata-rata yang relatif konstan dan tidak menunjukkan adanya pola tren yang sistematis. Varians data juga terlihat relatif stabil dari waktu ke waktu.
+
+### Plot ACF
+
+```{r}
+acf(Y.ts, main = "ACF MA(2) - Manual")
+
+acf(Y.sim, main = "ACF MA(2) - arima.sim")
+```
+
+Plot ACF menunjukkan terdapat korelasi yang signifikan hingga lag ke-2, kemudian nilai autokorelasi menurun dan berada di sekitar nol setelah lag ke-2. Pola ini sesuai dengan karakteristik model MA(2).
+
+### Plot PACF
+
+```{r}
+pacf(Y.ts, main = "PACF MA(2) - Manual")
+
+pacf(Y.sim, main = "PACF MA(2) - arima.sim")
+```
+
+Plot PACF menunjukkan nilai autokorelasi parsial tidak terputus secara tegas pada lag tertentu, tetapi cenderung menurun secara bertahap (tailing off). Pola tersebut juga mendukung dugaan bahwa data mengikuti model MA(2).
+
+### Plot EACF
+
+```{r}
+eacf(Y.ts)
+eacf(Y.sim)
+```
+
+Plot EACF menunjukkan pola yang mengarah pada model MA(2), yang ditandai dengan adanya pola segitiga dengan titik awal pada orde MA 2.
+
+### Uji ADF
+
+```{r}
+adf.test(Y.ts)
+adf.test(Y.sim)
+```
+
+### Kesimpulan
+
+Dari keempat plot tersebut, data dapat dikatakan stasioner karena tidak menunjukkan tren dan memiliki varians yang relatif konstan, serta ACF mengalami cut off setelah lag ke-2. Hal tersebut juga didukung oleh uji Augmented Dickey-Fuller (ADF) yang menunjukkan p-value \< 0,05, sehingga H₀ ditolak. Dengan demikian, terdapat cukup bukti bahwa data stasioner dan karakteristik ACF mendukung model MA(2).
+
+## Scatter Plot
+
+### yt vs yt-1
+
+```{r}
+Y_lag1 <- Y.ts[-length(Y.ts)]
+Y_now1 <- Y.ts[-1]
+
+plot(
+  Y_lag1,
+  Y_now1,
+  main = expression(Y[t] ~ "vs" ~ Y[t-1]),
+  xlab = expression(Y[t-1]),
+  ylab = expression(Y[t])
+)
+
+cor.test(Y_lag1, Y_now1)
+```
+
+### yt vs yt-2
+
+```{r}
+Y_lag2 <- Y.ts[-c(length(Y.ts)-1, length(Y.ts))]
+Y_now2 <- Y.ts[-c(1, 2)]
+
+plot(
+  Y_lag2,
+  Y_now2,
+  main = expression(Y[t] ~ "vs" ~ Y[t-2]),
+  xlab = expression(Y[t-2]),
+  ylab = expression(Y[t])
+)
+cor.test(Y_lag2, Y_now2)
+```
+
+### yt vs yt-3
+
+```{r}
+Y_lag3 <- Y.ts[-c(length(Y.ts)-2, length(Y.ts)-1, length(Y.ts))]
+Y_now3 <- Y.ts[-c(1, 2, 3)]
+
+plot(
+  Y_lag3,
+  Y_now3,
+  main = expression(Y[t] ~ "vs" ~ Y[t-3]),
+  xlab = expression(Y[t-3]),
+  ylab = expression(Y[t])
+)
+
+cor.test(Y_lag3, Y_now3)
+```
+
+## Auto Korelasi
+
+### Autokorelasi Bangkitan
+
+```{r}
+acf(Y.ts, lag.max = 10, plot = FALSE)$acf
+acf(Y.sim, lag.max = 10, plot = FALSE)$acf
+```
+
+Hasil bangkitan menunjukkan bahwa autokorelasi signifikan terutama pada lag 1 dan lag 2, kemudian cenderung mendekati nol pada lag berikutnya. Pola tersebut sesuai dengan karakteristik model MA(2), sehingga data hasil bangkitan dapat dikatakan mengikuti karakteristik MA(2).
+
+### Auto Korelasi Teoritis
+
+```{r}
+rho1 <- (-theta1 * (1 - theta2)) /
+  (1 + theta1^2 + theta2^2)
+
+rho2 <- (-theta2) /
+  (1 + theta1^2 + theta2^2)
+
+rho1
+rho2
+```
+
+Secara teoritis, autokorelasi pada model MA(2) bernilai -0,1053 pada lag 1 dan -0,3947 pada lag 2. Untuk lag 3 dan seterusnya, autokorelasi bernilai 0 karena ρk​=0 , untuk k\>q di MA(q). Dengan demikian, ACF secara teoritis mengalami cut off setelah lag ke-2, yang merupakan karakteristik dari model MA(2).
+
+
+
+# Nomor 2 AR(2)
+
+## Membangkit Model
+
+### Manual
+
+```{r}
+set.seed(125)
+
+phi1 <- 0.5
+phi2 <- 0.2
+n <- 300
+
+e <- rnorm(n)
+Y <- numeric(n)
+
+Y[1] <- e[1]
+Y[2] <- e[2] + phi1 * Y[1]
+
+# Proses AR(2)
+for (t in 3:n) {
+  Y[t] <- phi1 * Y[t-1] + phi2 * Y[t-2] + e[t]
+}
+Y
+```
+
+### arima.sim
+
+```{r}
+set.seed(125)
+
+Y.sim2 <- arima.sim(
+  model = list(ar = c(phi1, phi2)),
+  n = n
+)
+
+Y.sim2
+```
+
+## Plot
+
+### Plot Time Series
+
+```{r}
+ts.plot(Y, main = "Time Series RA(2) - Manual",
+  xlab = "Waktu",
+  ylab = "Y"
+)
+
+ts.plot(Y.sim2, main = "Time Series RA(2) - arima.sim",
+  xlab = "Waktu",
+  ylab = "Y"
+)
+```
+
+Plot time series menunjukkan data berfluktuasi di sekitar nilai rata-rata yang relatif konstan dan tidak menunjukkan adanya pola tren yang sistematis. Varians data juga terlihat relatif stabil dari waktu ke waktu.
+
+### Plot ACF
+
+```{r}
+acf(Y,main = "ACF AR(2) - Manual")
+
+acf(Y.sim2,main = "ACF AR(2) - arima.sim")
+```
+
+Plot ACF menunjukkan nilai autokorelasi yang tinggi pada beberapa lag awal kemudian menurun secara bertahap (tails off). Pola tersebut sesuai dengan karakteristik model AR(2), yaitu ACF tidak mengalami cut off secara langsung.
+
+
+### Plot PACF
+
+```{r}
+pacf(Y,main = "PACF AR(2) - Manual")
+
+pacf(Y.sim2,main = "PACF AR(2) - arima.sim")
+```
+
+Plot PACF menunjukkan adanya spike yang menonjol hingga lag ke-2, kemudian nilai autokorelasi parsial cenderung berada di sekitar nol. Pola tersebut sesuai dengan karakteristik model AR(2), yaitu PACF mengalami cut off setelah lag ke-2.
+
+```{r}
+eacf(Y)
+eacf(Y.sim2)
+```
+
+Plot EACF menunjukkan pola yang mengarah pada model AR(2), dengan pola segitiga yang mengindikasikan orde AR pada lag ke-2 dan orde MA sebesar 0.
+
+
+### Uji ADF
+
+```{r}
+adf.test(Y)
+adf.test(Y.sim)
+```
+
+### Kesimpulan
+
+Dari keempat plot tersebut, data dapat dikatakan stasioner karena tidak menunjukkan tren dan memiliki varians yang relatif konstan. Hal tersebut juga didukung oleh uji ADF yang menghasilkan p-value sebesar 0,01 < 0,05, sehingga H₀ ditolak. Dengan demikian, terdapat cukup bukti bahwa data stasioner dan karakteristik ACF serta PACF mendukung model AR(2).
+
+
+## scatterplot
+
+### Yt vs Yt-1
+
+```{r}
+yt <- Y[3:n]
+yt_1 <- Y[2:(n-1)]
+
+plot(
+  yt_1,
+  yt,
+  main = expression(paste("Scatterplot ", Y[t], " dengan ", Y[t-1])),
+  xlab = expression(Y[t-1]),
+  ylab = expression(Y[t])
+)
+
+cor.test(yt, yt_1)
+```
+
+### Yt vs Yt-2
+
+```{r}
+yt_2 <- Y[1:(n-2)]
+
+plot(
+  yt_2,
+  yt,
+  main = expression(paste("Scatterplot ", Y[t], " dengan ", Y[t-2])),
+  xlab = expression(Y[t-2]),
+  ylab = expression(Y[t])
+)
+
+cor.test(yt, yt_2)
+```
+
+### Yt vs Yt-3
+
+```{r}
+yt_3 <- Y[1:(n-3)]
+yt_3_current <- Y[4:n]
+
+plot(
+  yt_3,
+  yt_3_current,
+  main = expression(paste("Scatterplot ", Y[t], " dengan ", Y[t-3])),
+  xlab = expression(Y[t-3]),
+  ylab = expression(Y[t])
+)
+
+cor.test(yt_3_current, yt_3)
+```
+
+## Autokorelasi
+
+### Empiris
+
+```{r}
+acf_Y <- acf(Y, plot = FALSE)
+empiris <- acf_Y$acf[2:4]
+
+empiris
+```
+
+Nilai autokorelasi empiris pada lag 1, 2, dan 3 berturut-turut adalah 0,5178; 0,3788; dan 0,3167. Nilai tersebut menunjukkan autokorelasi positif yang semakin menurun seiring bertambahnya lag.
+
+### Teoritis
+
+```{r}
+rho1 <- phi1 / (1 - phi2)
+rho2 <- phi1 * rho1 + phi2
+rho3 <- phi1 * rho2 + phi2 * rho1
+teoritis <- c(rho1, rho2, rho3)
+
+teoritis
+```
+
+Secara teoritis, nilai autokorelasi pada lag 1, 2, dan 3 adalah 0,6250; 0,5125; dan 0,38125. Nilainya juga menunjukkan pola positif yang semakin menurun pada lag yang lebih tinggi.
+
+```{r}
+data.frame(
+  Lag = 1:3,
+  Empiris = empiris,
+  Teoritis = teoritis
+)
+```
+
+Nilai empiris berbeda dengan nilai teoritis, tetapi keduanya memiliki pola yang sama, yaitu autokorelasi positif dan menurun. Perbedaan nilai terjadi karena nilai empiris diperoleh dari data hasil bangkitan, sedangkan nilai teoritis diperoleh berdasarkan perhitungan matematis.
+
+
+
+
+
+# Nomor 3 ARMA(2,2)
+
+## Pembangkitan model
+
+### Manual
+
+```{r}
+phi1 <- 0.5
+phi2 <- 0.2
+theta1 <- 0.4
+theta2 <- 0.6
+n <- 300
+
+set.seed(125)
+
+e <- rnorm(n)
+Y.arma <- numeric(n)
+
+Y.arma[1] <- e[1]
+Y.arma[2] <- e[2] + phi1 * Y.arma[1] +
+  theta1 * e[1]
+
+for (t in 3:n) {
+  Y.arma[t] <- phi1 * Y.arma[t-1] +
+    phi2 * Y.arma[t-2] +
+    e[t] +
+    theta1 * e[t-1] +
+    theta2 * e[t-2]
+}
+
+Y.arma.ts <- ts(Y.arma)
+Y.arma.ts
+```
+
+### Arma.sim
+
+```{r}
+set.seed(125)
+
+Y.arma.sim <- arima.sim(
+  model = list(
+    ar = c(phi1, phi2),
+    ma = c(theta1, theta2)
+  ),
+  n = n
+)
+
+Y.arma.sim
+```
+
+## plot
+
+### Plot Time series
+
+```{r}
+
+
+plot(Y.arma.ts, main = "ARMA(2,2) Manual",
+  ylab = "Y",
+  xlab = "Waktu"
+)
+
+plot(Y.arma.sim, main = "ARMA(2,2) arima.sim",
+  ylab = "Y",
+  xlab = "Waktu"
+)
+
+```
+
+Plot time series menunjukkan data berfluktuasi di sekitar nilai rata-rata yang relatif konstan dan tidak menunjukkan pola tren yang sistematis. Varians data juga terlihat relatif stabil dari waktu ke waktu.
+
+### Plot ACF
+
+```{r}
+acf(Y.arma.ts, main = "ACF ARMA(2,2) Manual")
+
+acf(Y.arma.sim, main = "ACF ARMA(2,2) arima.sim")
+```
+
+Plot ACF menunjukkan nilai autokorelasi yang cukup besar pada beberapa lag awal kemudian menurun secara bertahap (tails off). 
+
+
+### plot PACF
+
+```{r}
+pacf(Y.arma.ts, main = "PACF ARMA(2,2) Manual")
+
+pacf(Y.arma.sim, main = "PACF ARMA(2,2) arima.sim")
+```
+
+Plot PACF juga menunjukkan pola yang menurun secara bertahap (tails off), sehingga karakteristik ACF dan PACF tersebut sesuai dengan proses ARMA(2,2).
+
+
+### Plot Eacf
+
+```{r}
+eacf(Y.arma.ts)
+
+eacf(Y.arma.sim)
+```
+
+Plot EACF menunjukkan pola yang mengarah pada model ARMA(2,2), ditandai dengan pola segitiga yang mengarah pada orde AR 2 dan MA 2.
+
+### Uji ADF
+
+```{r}
+adf.test(Y.arma.ts)
+adf.test(Y.arma.sim)
+```
+
+### Kesimpulan
+
+Dari plot tersebut, data dapat dikatakan stasioner karena tidak menunjukkan tren dan varians relatif konstan. Hal ini juga didukung oleh uji ADF dengan p-value < 0,05, sehingga H₀ ditolak dan terdapat cukup bukti bahwa data stasioner serta memiliki karakteristik yang mendukung model ARMA(2,2).
+
+
+## Scatterplot
+
+### Yt vs Yt-1
+
+```{r}
+yt <- Y.arma[3:n]
+yt_1 <- Y.arma[2:(n-1)]
+
+plot(
+  yt_1, yt,
+  main = expression(Y[t] ~ "vs" ~ Y[t-1]),
+  xlab = expression(Y[t-1]),
+  ylab = expression(Y[t])
+)
+
+cor.test(yt, yt_1)
+
+```
+### Yt vs Yt-2
+
+```{r}
+yt_2 <- Y.arma[1:(n-2)]
+
+plot(
+  yt_2, yt,
+  main = expression(Y[t] ~ "vs" ~ Y[t-2]),
+  xlab = expression(Y[t-2]),
+  ylab = expression(Y[t])
+)
+
+cor.test(yt, yt_2)
+
+```
+
+
+### Yt vs Yt-3
+
+```{r}
+yt_3 <- Y.arma[1:(n-3)]
+yt_3_current <- Y.arma[4:n]
+
+plot(
+  yt_3, yt_3_current,
+  main = expression(Y[t] ~ "vs" ~ Y[t-3]),
+  xlab = expression(Y[t-3]),
+  ylab = expression(Y[t])
+)
+
+cor.test(yt_3_current, yt_3)
+```
+
+## Autokorelasi
+
+### Empiris
+
+```{r}
+# Autokorelasi empiris
+acf.empiris <- acf(Y.arma.ts, lag.max = 10, plot = FALSE)$acf
+
+acf.empiris
+
+```
+
+Berdasarkan tabel, nilai autokorelasi empiris pada lag 1, 2, dan 3 berturut-turut adalah 0,7608; 0,5745; dan 0,4886. Nilai tersebut menunjukkan adanya autokorelasi positif yang semakin menurun seiring bertambahnya lag.
+
+### Teoritis
+
+```{r}
+acf.teoritis <- ARMAacf(
+  ar = c(phi1, phi2),
+  ma = c(theta1, theta2),
+  lag.max = 3
+)
+
+data.frame(
+  Lag = 1:3,
+  Empiris = as.numeric(acf.empiris[2:4]),
+  Teoritis = as.numeric(acf.teoritis[2:4])
+)
+```
+
+Secara teoritis, nilai autokorelasi pada lag 1, 2, dan 3 adalah 0,8592; 0,7492; dan 0,5464. Nilai teoritis juga menunjukkan pola autokorelasi positif yang semakin menurun, dan nilainya lebih tinggi daripada nilai empiris pada ketiga lag tersebut.
+
+Perbandingan: Nilai empiris berbeda dengan nilai teoritis, tetapi keduanya menunjukkan pola yang sama, yaitu autokorelasi positif yang menurun seiring bertambahnya lag. Perbedaan tersebut terjadi karena nilai empiris diperoleh dari data hasil simulasi, sedangkan nilai teoritis diperoleh berdasarkan karakteristik matematis model ARMA(2,2).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
